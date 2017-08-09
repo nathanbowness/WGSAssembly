@@ -1,10 +1,11 @@
 import os
-import datetime
-from pyaccessories.TimeLog import Timer
+
 
 class CustomValues:
     # none
-    ftp = None
+    ftp_password = 'xt5X6NvC'
+    ftp_user = 'koziola'
+
 
 class CustomKeys:
 
@@ -19,3 +20,12 @@ class UtilityMethods:
         """ Creates the the output directory if it doesn't exist """
         if not os.path.exists(os.path.join(basepath, path_ext)):
             os.makedirs(os.path.join(basepath, path_ext))
+
+
+class ExternalFolderNames:
+    @staticmethod
+    def get_names():
+        """Returns a list of the possible folder names that are on the nas"""
+        # does not include the structure to Non Food
+
+        folder_names = ["BUR", "CAL", "DAR", "GTA", "HC_LON", "OLF", "STH"]

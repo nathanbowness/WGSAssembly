@@ -7,6 +7,7 @@ import csv
 # Author: Nathan Bowness, Modified from Adam Koziol's code -
 # https://github.com/adamkoziol/SPAdesPipeline/blob/dev/OLCspades/ftpdownload.py
 
+
 class FTPDownload(object):
 
     def __init__(self, username, password, issue):
@@ -16,9 +17,10 @@ class FTPDownload(object):
         self.improper_files = list()
 
         temp_files = 'temp_files'
+        folder_name = issue.description.rstrip()
 
         # TODO make this come in as part of the request
-        self.downloadpath = 'ftp.agr.gc.ca/incoming/cfia-ak/BUR_2017-06-30/'
+        self.downloadpath = 'ftp.agr.gc.ca/incoming/cfia-ak/' + folder_name
 
         # Create a URL that includes the user name and password, so PycURL can login to the FTP server
         self.destinationurl = 'ftp://{}:{}@{}'.format(self.username, self.password, self.downloadpath)
@@ -30,11 +32,20 @@ class FTPDownload(object):
 
     def ftp_validate_upload(self):
         """
-        Comment
+        Validate the uploaded samplesheet and files by the lab
+        :return If the files were properly uploaded return True, otherwise return False
         """
         self.download_samplesheet()
-        self.validate_uploaded_files()
-        print()
+
+        ftp_names = self.get_ftp_files_names()
+        samplesheet_names = self.get_samplesheet_names()
+        self.match_results(ftp_names, samplesheet_names)
+
+        if self.improper_files is None:
+            # Successful upload
+            return True
+        # Usuccessful upload
+        return False
 
     def download_samplesheet(self):
 
@@ -51,22 +62,22 @@ class FTPDownload(object):
             except ConnectionError as e:
                 print('There was an error finding the SampleSheet.csv on the ftp server - %s' % e.args[0])
 
-    def validate_uploaded_files(self):
+    def download_ftp_files(self):
         """
-        Comment
+        Download all files from the ftp server to the Nas in the proper External MySEQ folder
+        :return:
         """
-        ftp_names = self.get_ftp_files_names()
-        samplesheet_names = self.get_samplesheet_names()
-        self.match_results(ftp_names, samplesheet_names)
-
 
     def get_ftp_files_names(self):
+        """
+        Return a list of all the files names that were uploaded on the ftp server  
+        """
         curl = pycurl.Curl()
 
         # iterate through the path for files given on the ftp server
         curl.setopt(pycurl.URL, self.destinationurl)
         output = BytesIO()
-        # write the output the the ioreader in bytes
+        # write the output the ioreader in bytes
         curl.setopt(pycurl.WRITEFUNCTION, output.write)
         curl.perform()
         curl.close()
@@ -82,6 +93,10 @@ class FTPDownload(object):
         return ftp_files
 
     def get_samplesheet_names(self):
+        """
+        Return a list of all the files names that were referenced in the SampleSheet
+        """
+
         regex = r'^(2\d{3}-\w{2,10}-\d{3,4})$'
         import re
         csv_names = list()
@@ -106,6 +121,13 @@ class FTPDownload(object):
         return csv_names
 
     def match_results(self, ftp_names, samplesheet_names):
+        """
+        Match the file names from both inputs, if there are any files on the sample sheet not uploaded then add those
+        files to the improper_files list
+        :param ftp_names: List of file names that were on the ftp server
+        :param samplesheet_names: List of file names that were referenced in the sample sheet
+        :return: 
+        """
 
         for samplesheet_name in samplesheet_names:
             count = 0

@@ -12,7 +12,8 @@ class Assemble(object):
 
         self.timelog = create_time_log(FileExtension.runner_log)
 
-        custom_terms = {CustomKeys.ftp_user: (None, True, str), CustomKeys.ftp_password: (None, True, str)}
+        custom_terms = {CustomKeys.ftp_user: (CustomValues.ftp_user, True, str),
+                        CustomKeys.ftp_password: (CustomValues.ftp_password, True, str)}
         setup = Setup(time_log=self.timelog, custom_terms=custom_terms)
         setup.set_api_key(force)
 
@@ -27,10 +28,14 @@ class Assemble(object):
         self.redmine_access = RedmineAccess(self.timelog, self.redmine_api_key)
 
         self.botmsg = '\n\n_I am a bot. This action was performed automatically._'  # sets bot message
-        self.issue_title = 'irida retrieve'
+        self.issue_title = 'wgs assembly'
         self.issue_status = 'Feedback'
 
     def timed_retrieve(self):
+        """
+        
+        :return: 
+        """
         import time
         while True:
             # Get issues matching the issue status and title
@@ -42,36 +47,31 @@ class Assemble(object):
             self.timelog.time_print("Waiting for the next check.")
             time.sleep(self.seconds_between_checks)
 
-    def run_retrieve(self):
-        self.timelog.time_print("Checking for extraction requests...")
-
-        found = self.redmine_access.retrieve_issues(self.issue_status, self.issue_title)
-        self.timelog.time_print("Found %d new issue(s)..." % len(found))  # returns number of issues
-
-        while len(found) > 0:  # While there are still issues to respond to
-            self.respond_to_issue(found.pop(len(found)-1))
-
     def respond_to_issue(self, issue):
 
         self.timelog.time_print("Found a request to run. Subject: %s. ID: %s" % (issue.subject, issue.id))
         self.timelog.time_print("Adding to the list of responded to requests.")
 
-        # TODO access the ftp server and run the command
+        # TODO run the issue, do the commands
 
         self.redmine_access.log_new_issue(issue)
 
         sequences_info = list()
         ftpaccess = FTPDownload(self.ftp_username, self.ftp_password, issue)
-        ftpaccess.ftp_validate_upload()
+        is_validated = ftpaccess.ftp_validate_upload()
 
-
-        # TODO if anything in the improper files, just can the entire run
+        if is_validated is True:
+            # download all files
+            ftpaccess.download_ftp_files()
+        else:
+            # TODO if anything in the improper files, just can the entire run --->> Make sure to log properly
+            self.completed_response(issue, ftpaccess.improper_files)
 
         # input_list = self.parse_redmine_attached_file(issue)
         # output_folder = os.path.join(self.drive_mnt, str(issue.id))
 
         # for input_line in input_list:
-        #     if input_line is not '':
+        #     if input_line is not '':CustomValues
         #         sequences_info.append(SequenceInfo(input_line))
 
         try:
