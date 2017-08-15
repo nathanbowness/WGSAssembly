@@ -28,4 +28,4 @@ class ExternalFolderNames:
         """Returns a list of the possible folder names that are on the nas"""
         # does not include the structure to Non Food
 
-        folder_names = ["BUR", "CAL", "DAR", "GTA", "HC_LON", "OLF", "STH"]
+        return ["BUR", "CAL", "DAR", "GTA", "HC_LON", "OLF", "STH"]
