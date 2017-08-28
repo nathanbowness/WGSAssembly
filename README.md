@@ -28,8 +28,6 @@ information (i.e. Description, Topic...). It will then update the author on Redm
 will run a series of operations needed to complete the WGS Assembly Process. The process entails 5 main portions
 which executed in order: 
 
-<br />
-
 ##### FTP - ServerInfo
 The ServerInfo object is used to store variables that can be passed through to all the different ftp processes used. It 
 is created first and it contains:
@@ -39,7 +37,6 @@ is created first and it contains:
 - destinationurl - Url used to access the files on the ftp server with pycurl
 - lab_name - Lab abbreviation name used when storing data in the correct places
 
-<br />
 
 ##### FTP - Download
 The Download class takes the ServerInfo object as input and uses pycurl to download files from the ftp server 
@@ -48,7 +45,6 @@ into specified locations on the nas.
 This class is used to Download the sample sheet from the ftp as the first step. Then if the files are validated 
 it will be called again to download the remaining files into the proper 'MiSeq_Backup' folder.
 
-<br />
 
 ##### FTP - Validation
 The Validation class takes the ServerInfo object as input; it uses the downloaded SampleSheet 
@@ -60,7 +56,6 @@ remainder of the steps may occur.
 If there is not 2 files associated with a sample on the SampleSheet, the author will be updated as to which files are 
 missing a pair. The author must remedy this and create a new issue with the proper files/samplesheet.
 
-<br />
 
 ##### File Assembly
 Once the files have been validated, they must be manipulated through the nas so the pipeline can be run and for the 
