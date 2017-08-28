@@ -22,13 +22,13 @@ to their proper location in the 'MiSeq_Backup' folders on the server. The files 
 folder where the pipeline is run. Once the pipeline has completed, the results are stored in the proper 
 'WGSspades' folder. Finally the results are uploaded back to the author on Redmine and on the FTP.
 
-##### respond_to_issue(self, issue)
+#### respond_to_issue(self, issue)
 This method is from the GenericRedmineAutomator and takes an individual issue from Redmine, with all of its base 
 information (i.e. Description, Topic...). It will then update the author on Redmine that the task is in progress and 
 will run a series of operations needed to complete the WGS Assembly Process. The process entails 5 main portions
 which executed in order: 
 
-##### FTP - ServerInfo
+#### FTP - ServerInfo
 The ServerInfo object is used to store variables that can be passed through to all the different ftp processes used. It 
 is created first and it contains:
 - ftp username, ftp password
@@ -38,7 +38,7 @@ is created first and it contains:
 - lab_name - Lab abbreviation name used when storing data in the correct places
 
 
-##### FTP - Download
+#### FTP - Download
 The Download class takes the ServerInfo object as input and uses pycurl to download files from the ftp server 
 into specified locations on the nas. 
 
@@ -46,7 +46,7 @@ This class is used to Download the sample sheet from the ftp as the first step. 
 it will be called again to download the remaining files into the proper 'MiSeq_Backup' folder.
 
 
-##### FTP - Validation
+#### FTP - Validation
 The Validation class takes the ServerInfo object as input; it uses the downloaded SampleSheet 
 (from the specified folder) as reference for which files should be contained within that same folder.
 
@@ -57,7 +57,7 @@ If there is not 2 files associated with a sample on the SampleSheet, the author 
 missing a pair. The author must remedy this and create a new issue with the proper files/samplesheet.
 
 
-##### File Assembly
+#### File Assembly
 Once the files have been validated, they must be manipulated through the nas so the pipeline can be run and for the 
 files to be stored correctly. The files are moved in the following steps: 
 
@@ -80,7 +80,7 @@ However the 'Best Assemblies' folder should be shared as well, but is too large 
 So both it and "Results" folder should be zipped and uploaded to the ftp server in the directory 
 "/outgoing/cfia-ak/your_folder_ftp_results.zip"
 
-##### FTP Upload
+#### FTP Upload
 Once the pipeline has been completed and the files stored correctly as stated above. This class will zip together the 
 "Best Assemblies" and "Reports" folders. 
 
