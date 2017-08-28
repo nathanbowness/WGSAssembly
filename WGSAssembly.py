@@ -10,7 +10,7 @@ from FTPUpload import Upload
 from FileAssembly import Assembly
 
 
-class Assemble(object):
+class Automate(object):
 
     def __init__(self, force):
 
@@ -47,7 +47,7 @@ class Assemble(object):
 
     def timed_retrieve(self):
         """
-        Continuously search Redmine for the inputted period of time, 
+        Continuously search Redmine in intervals of the inputted time period, 
         Log errors to the log file as they occur
         """
         import time
@@ -69,12 +69,13 @@ class Assemble(object):
         self.timelog.time_print("Adding to the list of responded to requests.")
         self.access_redmine.log_new_issue(issue)
 
-
         try:
-
+            # Initialize all needed object to run the WGS Assembly process
             ftp_server = ServerInfo(self.ftp_username, self.ftp_password, issue)
             ftp_download = Download(ftp_server, issue, self.timelog)
             ftp_validation = Validation(ftp_server, ftp_download.samplesheet_path, self.timelog)
+            assembly = Assembly(self.nas_mnt, self.timelog, ftp_server)
+            ftp_upload = Upload(ftp_server, self.timelog)
 
             is_validated = ftp_validation.validate_upload()
             if is_validated is True:
@@ -85,76 +86,70 @@ class Assemble(object):
                 self.access_redmine.update_status_inprogress(issue)
 
                 # download all files from the FTP Server to proper MiSeq_Backup location on the nas
-                self.timelog.time_print("Beginning download of all files from the folder: %s on the FTP Server."
-                                        % ftp_server.folder_name)
-                download_dir = ftp_download.download_all_files(self.nas_mnt, ftp_server.all_files)
-                download_message = "Ftp files were downloaded to %s." % str(download_dir)
+                download_dir = ftp_download.download_all_files(self.nas_mnt)
+
+                issue.redmine_msg = "Ftp files were downloaded to %s." % str(download_dir)
+                self.access_redmine.update_status_inprogress(issue)
 
                 # All files need to be linked to the "To_Assemble" folder
-                assembly = Assembly(self.nas_mnt, self.timelog,ftp_server.all_files)
-                self.timelog.time_print("Creating Symbolic links to the \"To_Assemble\" folder on the nas for all "
-                                        "the files downloaded.")
-                assembly.create_symbolic_link(download_dir, ftp_server.folder_name)
-                self.timelog.time_print("Waiting for the assembly process to finish.")
-                assembly_done = assembly.wait_for_assembly(ftp_server.folder_name)
+                assembly.create_symbolic_link(download_dir)
+                assembly_done = assembly.wait_for_assembly()
+
                 if assembly_done:
-                    self.timelog.time_print("The files have been assembled in the folder: %s" % (ftp_server.folder_name
-                                            + "_Assembled"))
-                    self.timelog.time_print("Moving files into the proper WGSSpades section on the nas.")
-                    wgs_dir = assembly.move_to_wgsspades(ftp_server.folder_name, ftp_server.lab_name)
-                    download_message = "The assembled files were moved to %s." % str(wgs_dir)
-                    # Zip all the assembled files needed within the folder
-                    zip_path = assembly.zip_wgsspades_files(ftp_server.folder_name, wgs_dir)
-                    self.timelog.time_print("Created zip file: %s" % zip_path)
-
-                    # ftp_upload = Upload(ftp_server, issue, self.timelog)
-                    # ftp_upload.upload_zip_file("")
-
+                    # Move the folder to the proper section on the nas and zip the results intended for Redmine
+                    wgs_dir = assembly.move_to_wgsspades()
+                    zip_path = assembly.zip_wgsspades_files(wgs_dir)
+                    # Upload the zip file to Redmine
                     self.access_redmine.redmine_api.upload_file(zip_path, issue.id, 'application/zip',
                                                                 file_name_once_uploaded=ftp_server.folder_name+".zip")
                     self.timelog.time_print("Uploaded zip file to the request on Redmine for issue: %s" % str(issue.id))
+
+                    # Create the zip file intended to be uploaded to the ftp server and upload it
+                    ftp_upload.create_ftp_zip_file(wgs_dir)
+                    # ftp_upload.upload_zip_file()
+
+                    # Update the author that the issue task has been completed
+                    self.completed_response(issue, wgs_dir, ftp_validation.improper_files)
                 else:
-                    TimeoutError("The assembly process took longer than 3 hours. The automation process has timed out")
-
-                # Update the author that the issue task has been completed
-                self.completed_response(issue, download_message, ftp_validation.improper_files)
-
+                    TimeoutError("The assembly process took longer than 6 hours. The automation process has timed out")
             else:
                 self.completed_response(issue, "", ftp_validation.improper_files)
 
         except Exception as e:
             import traceback
-            self.timelog.time_print("[Warning] run.py had a problem, continuing redmine api anyways.")
+            self.timelog.time_print("[Warning] the automation process had a problem, continuing redmine api anyways.")
             self.timelog.time_print("[WGS Assembly Error Dump]\n" + traceback.format_exc())
             # Send response
-            message = "There was a problem with your request. Please create a new issue on" \
-                      " Redmine to re-run it.\n%s" % traceback.format_exc()
+            issue.redmine_msg = "There was a problem with your request. Please create a new issue on" \
+                                " Redmine to re-run it.\n%s" % traceback.format_exc()
             # Set it to feedback and assign it back to the author
-            self.access_redmine.update_issue_to_author(issue, message + self.botmsg)
+            self.access_redmine.update_issue_to_author(issue, self.botmsg)
 
-    def completed_response(self, issue, message, missing_files):
+    def completed_response(self, issue, wgs_dir, missing_files):
         """
         Update the issue back to the author once the process has finished
         :param issue: Specified Redmine issue the process has been completed on
+        :param wgs_dir" Directory where the WGS Assembly files were stored in the nas
         :param missing_files: All files that were not correctly uploaded
         """
-        msg =""
-        # TODO work on the final message and logging in the overall code
 
-        if len(missing_files) > 0 and message == "":
-            msg = "Not all files on the FTP server matched with the files on the Sample Sheet. Please submit a new " \
-                  "Redmine Request where the naming issues of the following files are fixed:\n"
+        # Assign the issue back to the Author
+        self.timelog.time_print("Assigning the issue: %s back to the author." % str(issue.id))
+
+        if len(missing_files) > 0 and wgs_dir == "":
+            issue.redmine_msg = "Not all files on the FTP server matched with the files on the Sample Sheet. " \
+                                "Please submit a new Redmine Request where the naming issues of the following " \
+                                "files are fixed:\n"
             for file in missing_files:
-                msg += file + '\n'
-
-                # Assign the request back to the author
-                self.access_redmine.update_issue_to_author(issue, msg + self.botmsg)
-
-        elif len(missing_files) > 0 and message != "":
-            self.access_redmine.update_issue_to_author(issue, "problem boi" + self.botmsg)
+                issue.redmine_msg += file + '\n'
         else:
-            msg = "The files have been downloaded to the nas, they are stored at %s" % message
-            self.access_redmine.update_issue_to_author(issue, msg + self.botmsg)
+            issue.redmine_msg = "The assembly files have been moved to the proper WGSspades folder, they are " \
+                                "stored at %s on the nas." % wgs_dir
 
-        self.timelog.time_print("The request has been completed.\n" + msg +
-                                "\nThe next request will be processed once available.")
+        # Update author on redmine
+        self.access_redmine.update_issue_to_author(issue, self.botmsg)
+
+        # Log the completion of the issue including the message sent to the author
+        self.timelog.time_print("\nMessage to author - %s\n" % issue.redmine_msg)
+        self.timelog.time_print("Completed Response to issue %s." % str(issue.id))
+        self.timelog.time_print("The next request will be processed once available")

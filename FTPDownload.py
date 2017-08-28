@@ -2,9 +2,6 @@ import os
 import pycurl
 from Utilities import UtilityMethods
 
-# Author: Nathan Bowness, Modified from Adam Koziol's code -
-# https://github.com/adamkoziol/SPAdesPipeline/blob/dev/OLCspades/ftpdownload.py
-
 
 class Download(object):
 
@@ -15,7 +12,7 @@ class Download(object):
 
         temp_files = 'temp_files'
 
-        # create temp paths for the files to be stored    (locally for now  ->   maybe nas later)
+        # Create temporary path for the files to be stored
         dir_path = os.path.dirname(os.path.realpath(__file__))
         UtilityMethods.create_dir(dir_path, temp_files + '/' + str(issue.id))
         self.samplesheet_path = os.path.join(dir_path, temp_files, str(issue.id), 'SampleSheet.csv')
@@ -23,6 +20,10 @@ class Download(object):
         self.download_sample_sheet()
 
     def download_sample_sheet(self):
+        """
+        Download the SampleSheet from within the specified folder on Redmine to be used later to validate 
+        the uploaded sequences
+        """
 
         # specific path for the SampleSheet within the given folder
         ftp_samplesheet = os.path.join(self.ftp_server.destinationurl, 'SampleSheet.csv')
@@ -37,39 +38,40 @@ class Download(object):
             except ConnectionError as e:
                 print('There was an error finding the SampleSheet.csv on the ftp server - %s' % e.args[0])
 
-    def download_all_files(self, nas_mnt, all_files):
+    def download_all_files(self, nas_mnt):
         """
-        Download all files from the ftp server to the Nas in the proper External MySEQ folder
-        :return:
+        Identify the proper folder for the files from the ftp server to be downloaded to
+        Then download all the files
+        :return: The place where the files were downloaded
         """
-        # Get the internal lab folder directory in the nas where the ftp files should be downloaded
-        download_dir = self.ftp_server.get_local_lab_path(nas_mnt, "MiSeq_Backup", all_files)
+        self.timelog.time_print("Beginning download process for all files from the folder: %s on the FTP Server."
+                                % self.ftp_server.folder_name)
 
-        if download_dir is None:
-            # Get the external lab folder directory in the nas where the ftp files should be downloaded
-            download_dir = self.ftp_server.get_external_lab_path(nas_mnt, "External_MiSeq_Backup", all_files)
+        if self.ftp_server.lab_name is "SEQ":
+            download_dir = os.path.join(nas_mnt, "MiSeq_Backup", self.ftp_server.folder_name)
 
-        if download_dir is None:
-            # Create the path to download files that cannot be validated according to their
-            # lab abbreviation in the filename
+        elif self.ftp_server.lab_name is not None:
+            download_dir = os.path.join(nas_mnt, "External_MiSeq_Backup", self.ftp_server.lab_name,
+                                        self.ftp_server.folder_name)
+        else:
             download_dir = os.path.join(nas_mnt, "External_MiSeq_Backup", 'na', self.ftp_server.folder_name)
 
-        self.download_ftp_folder(download_dir, all_files)
-        msg = str(download_dir)
+        self.download_ftp_folder(download_dir)
+        return str(download_dir)
 
-        return msg
+    def download_ftp_folder(self, download_dir):
+        """
+        Download each file that is in the specified folder on Redmine to the correct MiSeq_Backup folder in the nas
+        :param download_dir: Proper MiSeq_Backup folder on the nas - either local or external
+        """
 
-    def download_ftp_folder(self, download_dir, ftp_files):
-
-        # download_dir = "/home/bownessn/Documents/Test_WGS/" # -> For testing
-
-        # Create the directory to download files - if it does not exist
+        # Create the directory to download files - if it does not exist already
         UtilityMethods.create_dir(download_dir)
 
-        for file in ftp_files:
+        for file in self.ftp_server.all_files:
 
             local_file = os.path.join(download_dir, file)
-            ftp_file = os.path.join(self.ftp_server.destinationurl, 'SampleSheet.csv')
+            ftp_file = os.path.join(self.ftp_server.destinationurl, file)
 
             with open(local_file, 'wb') as localfile:
 
@@ -77,11 +79,11 @@ class Download(object):
                 curldownload = pycurl.Curl()
                 # Set the url to the ftp server path
                 curldownload.setopt(curldownload.URL, ftp_file)
-                # Write the data to the download file
+                # Write the data to a file
                 curldownload.setopt(curldownload.WRITEDATA, localfile)
 
                 try:
-                    self.timelog.time_print("Downloading file: %s into directory: %s" % (file, download_dir))
+                    self.timelog.time_print("   Downloading file: %s into directory: %s" % (file, download_dir))
                     curldownload.perform()
                     curldownload.close()
                 except ConnectionError as e:

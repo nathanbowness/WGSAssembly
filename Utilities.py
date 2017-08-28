@@ -3,7 +3,7 @@ import os
 
 class CustomValues:
     # none
-    ftp_password = 'xt5X6NvC'
+    ftp_password = 'GaUrgUEndeFi'
     ftp_user = 'koziola'
 
 

@@ -1,4 +1,4 @@
-from WGSAssembly import Assemble
+import WGSAssembly
 
 if __name__ == "__main__":
     import argparse
@@ -8,7 +8,7 @@ if __name__ == "__main__":
                         help="Don't ask to update redmine api key")
 
     args = parser.parse_args()
-    assembly = Assemble(args.force)
+    assembly = WGSAssembly.Automate(args.force)
 
     # try to run the assembler, if an error occurs print it
     try:

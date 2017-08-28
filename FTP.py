@@ -1,4 +1,3 @@
-import os
 import pycurl
 
 from io import BytesIO
@@ -16,90 +15,89 @@ class ServerInfo(object):
 
         # Create a URL that includes the user name and password, so PycURL can login to the FTP server
         self.destinationurl = 'ftp://{}:{}@{}'.format(self.username, self.password, self.downloadpath)
+        self.lab_name = None
 
         self.all_files = self.get_file_names()
-        self.lab_name = None
+        self.get_lab_name()
 
     def get_file_names(self):
         """
-        Return a list of all the files names that were uploaded on the ftp server in the folder specified
+        Return a list of all the files names that were uploaded on the ftp server in the folder specified on Redmine
         """
         curl = pycurl.Curl()
         output = BytesIO()
 
-        # iterate through the path for files given on the ftp server
+        # Iterate through the path for files given on the ftp server
         curl.setopt(curl.URL, self.destinationurl+"/")
 
-        # write the output the ioreader in bytes
+        # Write the output to ioreader in bytes
         curl.setopt(curl.WRITEFUNCTION, output.write)
 
         curl.perform()
         curl.close()
-
         ftp_files = list()
 
-        # each different file information is seperated by a \n character, encoded in bytes so must be decoded
+        # Each different file information is seperated by a \n character, encoded in bytes so must be decoded
         lines = output.getvalue().decode('utf-8').split('\n')
         for line in lines:
             if line:
-                # the last element of the line is the filename
+                # The last element of the line is the filename
                 ftp_files.append(line.split()[-1].rstrip())
 
         return ftp_files
 
-    def get_external_lab_path(self, nas_mnt, external_folder, all_files):
+    def get_lab_name(self):
         """
-        Check the files uploaded for any of the external lab name abbreviations in the file name
-        :return: The directory in the nas where the files are to be saved
+        Set the lab name abbreviation to be used for the file location in the nas
         """
+        self.set_local_lab_name()
 
-        # get possible external folder names to download the files into
-        folder_names = ExternalFolderNames.get_names()
-        # generic initial lab name
-        tracker = 0
-        save_dir = None
+        if self.lab_name is None:
+            self.set_external_lab_name()
 
-        # for each lab, check to see if the files belong in that folder
-        for name in folder_names:
-
-            # check each file name to see if it contracts the external lab abbreviation within it
-            for file in all_files:
-                if name in file:
-                    tracker += 1
-
-            # if 4 files are found with the external lab name in the file, Or there are less than 4 files any matches
-            # Download to the external lab folder in the nas
-            if tracker > 3 or (tracker > 0 and len(all_files) < 4):
-                save_dir = os.path.join(nas_mnt, external_folder, name, self.folder_name)
-                self.lab_name = name
-                break
-
-            # reset if the above conditions are not satisfied and retry with the another lab name
-            else:
-                tracker = 0
-
-        return save_dir
-
-    def get_local_lab_path(self, nas_mnt, local_folder, all_files):
+    def set_local_lab_name(self):
         """
-        Check the files uploaded for the local lab abbreviation in the file name
-        :return: The directory in the nas where the files are to be saved
+        Check and set the lab name to the proper local abbreviation if the files include 'SEQ' in more than 4 file names
         """
-
         local_name = "SEQ"
-        save_dir = None
         tracker = 0
 
-        for file in all_files:
+        for file in self.all_files:
 
-            # if 4 files are found with the local lab name in the file, download to the local lab folder in the nas
+            # If 4 files are found with the local lab name in the file, download to the local lab folder in the nas
             if tracker > 3:
                 self.lab_name = local_name
-                save_dir = os.path.join(nas_mnt, local_folder, self.folder_name)
                 break
 
-            # if local lab lab in found in the file name, add an occurrence to the tracker
+            # If local lab lab in found in the file name, add an occurrence to the tracker
             if local_name in file:
                 tracker += 1
 
-        return save_dir
+    def set_external_lab_name(self, ):
+        """
+        Check and set the lab name to the proper external abbreviation if the files include any external abbreviation 
+        in more than 4 file names
+        """
+
+        # Get possible external folder names to download the files into
+        folder_names = ExternalFolderNames.get_names()
+        # Generic initial lab name
+        tracker = 0
+
+        # For each lab, check to see if the files belong in that folder
+        for name in folder_names:
+
+            # Check each file name to see if it has the external lab abbreviation within it
+            for file in self.all_files:
+                if name in file:
+                    tracker += 1
+
+            # If 4 files are found with the external lab name in the file, or there are less than 4 files total
+            # within the folder and any matches occur. Download to the external lab folder in the nas
+            if tracker > 3 or (tracker > 0 and len(self.all_files) < 4):
+                self.lab_name = name
+                break
+
+            # Reset if the above conditions are not satisfied and retry with the another lab name
+            else:
+                tracker = 0
