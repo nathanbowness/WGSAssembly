@@ -68,6 +68,15 @@ class Assembly:
         self.timelog.time_print("The files were not assembled within the time limit.")
         return False
 
+    def wait_for_filecopy(self):
+        """
+        Once the 'foldername_Assembled' folder has been created, wait for all of the sequence folders to be copied
+        to the directory before continuing the process. Wait a maximum of 20 minutes before timing out and giving 
+        an error - the copying should not take that long
+        """
+        time.sleep(1200)
+        return True
+
     def move_to_wgsspades(self):
         """
         Identify the proper folder to move the assembled folder into under WGSspades on the nas

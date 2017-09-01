@@ -94,8 +94,8 @@ class Automate(object):
                 # All files need to be linked to the "To_Assemble" folder
                 assembly.create_symbolic_link(download_dir)
                 assembly_done = assembly.wait_for_assembly()
-
-                if assembly_done:
+                files_copied_done = assembly.wait_for_filecopy()
+                if assembly_done and files_copied_done:
                     # Move the folder to the proper section on the nas and zip the results intended for Redmine
                     wgs_dir = assembly.move_to_wgsspades()
                     zip_path = assembly.zip_wgsspades_files(wgs_dir)
@@ -111,7 +111,7 @@ class Automate(object):
                     # Update the author that the issue task has been completed
                     self.completed_response(issue, wgs_dir, ftp_validation.improper_files)
                 else:
-                    TimeoutError("The assembly process took longer than 6 hours. The automation process has timed out")
+                    self.completed_response(issue, "", ftp_validation.improper_files)
             else:
                 self.completed_response(issue, "", ftp_validation.improper_files)
 
@@ -142,9 +142,14 @@ class Automate(object):
                                 "files are fixed:\n"
             for file in missing_files:
                 issue.redmine_msg += file + '\n'
-        else:
+        elif wgs_dir != "":
+            # If the wgs dir is not empty and there are no missing files then update the author that it was a success
             issue.redmine_msg = "The assembly files have been moved to the proper WGSspades folder, they are " \
                                 "stored at %s on the nas." % wgs_dir
+        else:
+            # If there are no missing files but still no wgs_dir where the files were saved a timeout must have occurred
+            issue.redmine_msg = "The assembly process either took longer than 6 hours or the files were not " \
+                                "copied in under 30 minutes. The automation process has timed out"
 
         # Update author on redmine
         self.access_redmine.update_issue_to_author(issue, self.botmsg)

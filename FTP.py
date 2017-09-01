@@ -73,7 +73,7 @@ class ServerInfo(object):
             if local_name in file:
                 tracker += 1
 
-    def set_external_lab_name(self, ):
+    def set_external_lab_name(self):
         """
         Check and set the lab name to the proper external abbreviation if the files include any external abbreviation 
         in more than 4 file names
